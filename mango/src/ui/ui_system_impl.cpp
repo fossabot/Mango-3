@@ -11,7 +11,6 @@
 #include <glad/glad.h>
 #include <imgui.h>
 #include <mango/application.hpp>
-#include <mango/assert.hpp>
 #include <mango/profile.hpp>
 #include <ui/dear_imgui/imgui_glfw.hpp>
 #include <ui/dear_imgui/imgui_opengl3.hpp>
@@ -135,6 +134,7 @@ void ui_system_impl::configure(const ui_configuration& configuration)
 void ui_system_impl::update(float dt)
 {
     PROFILE_ZONE;
+    MANGO_UNUSED(dt);
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -154,8 +154,7 @@ void ui_system_impl::update(float dt)
     w_flags |= ImGuiWindowFlags_NoBackground;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("DockSpace", &dockspace_enabled, w_flags);
-    ImGui::PopStyleVar();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
 
     // real dock space
     if (dockspace_enabled)
@@ -164,11 +163,16 @@ void ui_system_impl::update(float dt)
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), d_flags);
     }
 
-    auto custom                       = m_configuration.get_custom_ui_data();
-    static bool custom_enabled        = true;
-    const bool* widgets               = m_configuration.get_ui_widgets();
-    static bool render_view_enabled   = true;
-    static bool hardware_info_enabled = true;
+    static bool cinema_view                        = false;
+    auto custom                                    = m_configuration.get_custom_ui_data();
+    static bool custom_enabled                     = true;
+    const bool* widgets                            = m_configuration.get_ui_widgets();
+    static bool render_view_enabled                = true;
+    static bool hardware_info_enabled              = true;
+    static bool scene_inspector_enabled            = true;
+    static bool material_inspector_enabled         = true;
+    static bool entity_component_inspector_enabled = true;
+    static bool render_system_widget_enabled       = true;
 
     // menu bar
     if (ImGui::BeginMenuBar())
@@ -183,28 +187,76 @@ void ui_system_impl::update(float dt)
         {
             if (widgets[ui_widget::render_view] && ImGui::MenuItem("Render View"))
                 render_view_enabled = true;
-            if (widgets[ui_widget::render_view] && ImGui::MenuItem("Hardware Info"))
+            if (widgets[ui_widget::hardware_info] && ImGui::MenuItem("Hardware Info"))
                 hardware_info_enabled = true;
+            if (widgets[ui_widget::scene_inspector] && ImGui::MenuItem("Scene Inspector"))
+                scene_inspector_enabled = true;
+            if (widgets[ui_widget::material_inspector] && ImGui::MenuItem("Material Inspector"))
+                material_inspector_enabled = true;
+            if (widgets[ui_widget::entity_component_inspector] && ImGui::MenuItem("Entity Component Inspector"))
+                entity_component_inspector_enabled = true;
+            if (widgets[ui_widget::render_system_ui] && ImGui::MenuItem("Render System Settings"))
+                render_system_widget_enabled = true;
             if (custom.function && !custom.always_open && ImGui::MenuItem(custom.window_name.c_str()))
                 custom_enabled = true;
             ImGui::EndMenu();
+        }
+        if (ImGui::MenuItem("Toggle Cinema View"))
+        {
+            cinema_view = !cinema_view;
         }
 
         ImGui::EndMenuBar();
     }
 
     // Render View
+    ImVec2 viewport_size = ImVec2(1080, 720);
     if (widgets[ui_widget::render_view] && render_view_enabled)
-        render_view_widget(m_shared_context, render_view_enabled);
+        viewport_size = render_view_widget(m_shared_context, render_view_enabled);
 
     // Hardware Info
-    if (widgets[ui_widget::hardware_info] && hardware_info_enabled)
-        hardware_info_widget(m_shared_context, hardware_info_enabled, dt);
+    if (widgets[ui_widget::hardware_info] && hardware_info_enabled && !cinema_view)
+        hardware_info_widget(m_shared_context, hardware_info_enabled);
 
     // Custom
     custom_enabled |= custom.always_open;
-    if (custom.function && custom_enabled)
+    if (custom.function && custom_enabled && !cinema_view)
         custom.function(custom_enabled);
+
+    // Inspectors
+
+    // Scene Inspector
+    static entity selected = invalid_entity;
+    entity tmp             = selected;
+    auto application_scene = m_shared_context->get_current_scene();
+    if (widgets[ui_widget::scene_inspector] && scene_inspector_enabled && !cinema_view)
+    {
+        scene_inspector_widget(application_scene, scene_inspector_enabled, selected);
+    }
+
+    auto rs = m_shared_context->get_resource_system_internal().lock();
+    MANGO_ASSERT(rs, "Resource system is expired!");
+    // Material Inspector
+    if (widgets[ui_widget::material_inspector] && material_inspector_enabled && !cinema_view)
+    {
+        if (selected != invalid_entity)
+        {
+            auto comp = application_scene->query_mesh_component(selected);
+            material_inspector_widget(comp, material_inspector_enabled, tmp != selected, selected, rs);
+        }
+        else
+            material_inspector_widget(nullptr, material_inspector_enabled, tmp != selected, selected, rs);
+    }
+
+    // ECS Inspector
+    if (widgets[ui_widget::entity_component_inspector] && entity_component_inspector_enabled && !cinema_view)
+        entity_component_inspector_widget(application_scene, entity_component_inspector_enabled, selected, rs, viewport_size);
+
+    auto render_s = m_shared_context->get_render_system_internal().lock();
+    MANGO_ASSERT(render_s, "Render system is expired!");
+    // Render system widget
+    if (widgets[ui_widget::render_system_ui] && render_system_widget_enabled && !cinema_view)
+        render_system_widget(render_s, render_system_widget_enabled);
 
     ImGui::End(); // dock space end
 }

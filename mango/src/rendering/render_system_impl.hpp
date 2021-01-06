@@ -27,13 +27,25 @@ namespace mango
         struct
         {
             int32 draw_calls;    //!< The number of draw calls.
-            int32 meshes;    //!< The number of meshes.
+            int32 meshes;        //!< The number of meshes.
             int32 primitives;    //!< The number of primitives.
-            int32 materials;    //!< The number of materials.
+            int32 materials;     //!< The number of materials.
+            int32 canvas_x;      //!< The x of the current render canvas.
+            int32 canvas_y;      //!< The y of the current render canvas.
             int32 canvas_width;  //!< The width of the current render canvas.
             int32 canvas_height; //!< The height of the current render canvas.
         } last_frame;            //!< Measured stats from the last rendered frame.
     };
+
+    //! \brief Structure to store data for adaptive exposure.
+    struct luminance_data
+    {
+        uint32 histogram[256]; //!< The histogram data
+        float luminance;       //!< Smoothed out average luminance.
+    };
+
+    enum class light_type : uint8;
+    struct light_data;
 
     //! \brief The implementation of the \a render_system.
     //! \details This class only manages the configuration of the base \a render_system and forwards everything else to the real implementation of the specific configured one.
@@ -47,16 +59,8 @@ namespace mango
 
         virtual bool create() override;
         virtual void configure(const render_configuration& configuration) override;
-
-        //! \brief Retrieves the \a command_buffer of a \a render_system.
-        //! \details The \a command_buffer should be created and destroyed by the \a render_system.
-        //! Also this specific \a command_buffer should not be executed externally. This would lead to undefined behavior.
-        //! \return The \a command_buffer of the \a render_system.
-        inline command_buffer_ptr get_command_buffer()
-        {
-            MANGO_ASSERT(m_current_render_system, "Current render sytem not valid!");
-            return m_current_render_system->m_command_buffer;
-        }
+        virtual void setup_ibl_step(const ibl_step_configuration& configuration) override;
+        virtual void setup_shadow_map_step(const shadow_step_configuration& configuration) override;
 
         //! \brief Does all the setup and has to be called before rendering the scene.
         //! \details Adds setup and clear calls to the \a command_buffer.
@@ -65,7 +69,8 @@ namespace mango
         //! \brief Renders the current frame.
         //! \details Calls the execute() function of the \a command_buffer, after doing some other things to it.
         //! This includes for example extra framebuffers and passes.
-        virtual void finish_render();
+        //! \param[in] dt Past time since last call.
+        virtual void finish_render(float dt);
 
         //! \brief Sets the viewport.
         //! \details  Should be called on resizing events, instead of scheduling a viewport command directly.
@@ -84,48 +89,59 @@ namespace mango
         //! \return The current set base \a render_pipeline of the \a render_system.
         virtual render_pipeline get_base_render_pipeline();
 
-        //! \brief Sets some model info for the next draw calls.
-        //! \param[in] model_matrix The model matrix for the next draw calls.
-        //! \param[in] has_normals Specifies if the next mesh has normals as a vertex attribute
-        //! \param[in] has_tangents Specifies if the next mesh has tangents as a vertex attribute
-        virtual void set_model_info(const glm::mat4& model_matrix, bool has_normals, bool has_tangents);
+        //! \brief Begin rendering a mesh.
+        //! \details This has to be called before using a material and drawing a primitive.
+        //! \param[in] model_matrix The model matrix to use.
+        //! \param[in] has_normals Specifies if the following mesh primitives have normals as a vertex attribute.
+        //! \param[in] has_tangents Specifies if the following mesh primitives have tangents as a vertex attribute.
+        virtual void begin_mesh(const glm::mat4& model_matrix, bool has_normals, bool has_tangents);
 
-        //! \brief Schedules drawing of a \a mesh with \a material.
-        //! \param[in] mat The \a material for the next draw call.
+        //! \brief End the model rendering.
+        //! \details Should be called after all mesh primitives are drawn.
+        virtual void end_mesh();
+
+        //! \brief Use a material.
+        //! \param[in] mat The \a material to use.
+        virtual void use_material(const material_ptr& mat);
+
+        //! \brief Schedules drawing of a \a mesh.
+        //! \param[in] vertex_array The \a vertex_array_ptr for the next draw call.
         //! \param[in] topology The topology used for drawing the bound vertex data.
         //! \param[in] first The first index to start drawing from. Has to be a positive value.
         //! \param[in] count The number of indices to draw. Has to be a positive value.
         //! \param[in] type The \a index_type of the values in the index buffer.
         //! \param[in] instance_count The number of instances to draw. Has to be a positive value. For normal drawing pass 1.
-        virtual void draw_mesh(const material_ptr& mat, primitive_topology topology, int32 first, int32 count, index_type type, int32 instance_count = 1);
-
-        //! \brief Sets the view projection matrix for the next draw calls.
-        //! \param[in] view_projection The view projection for the next draw calls.
-        virtual void set_view_projection_matrix(const glm::mat4& view_projection);
+        virtual void draw_mesh(const vertex_array_ptr& vertex_array, primitive_topology topology, int32 first, int32 count, index_type type, int32 instance_count = 1);
 
         //! \brief Sets the \a texture for a environment.
         //! \param[in] hdr_texture The pointer to the hdr \a texture to use as an environment.
-        //! \param[in] render_level The level from the hdr \a texture to render. -1 means no rendering.
-        virtual void set_environment_texture(const texture_ptr& hdr_texture, float render_level);
+        virtual void set_environment_texture(const texture_ptr& hdr_texture);
+
+        //! \brief Submits a light to the \a render_system.
+        //! \param[in] type The submitted \a light_type.
+        //! \param[in] data The \a light_data describing the submitted light.
+        virtual void submit_light(light_type type, light_data* data);
 
         //! \brief Returns the backbuffer of the a render_system.
         //! \return The backbuffer.
         virtual framebuffer_ptr get_backbuffer();
 
         //! \brief Returns some stats regarding hardware.
-        //! \return some stats regarding hardware.
+        //! \return Some stats regarding hardware.
         inline const hardware_stats& get_hardware_stats()
         {
             MANGO_ASSERT(m_current_render_system, "Current render sytem not valid!");
             return m_current_render_system->m_hardware_stats;
         }
 
+        //! \brief Custom UI function.
+        //! \details This can be called by any \a ui_widget and displays settings and debug information for the active \a render_system.
+        //! This does not draw any window, so it needs one surrounding it.
+        virtual void on_ui_widget();
+
       protected:
         //! \brief Mangos internal context for shared usage in all \a render_systems.
         shared_ptr<context_impl> m_shared_context;
-
-        //! \brief The \a command_buffer for the \a render_system.
-        command_buffer_ptr m_command_buffer;
 
         //! \brief The hardware stats.
         hardware_stats m_hardware_stats;

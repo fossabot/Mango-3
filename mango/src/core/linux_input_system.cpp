@@ -21,7 +21,7 @@ linux_input_system::linux_input_system(const shared_ptr<context_impl>& context)
     m_platform_data                       = std::make_shared<platform_data>();
     m_platform_data->native_window_handle = nullptr;
     m_last_scroll_offset                  = glm::vec2(0.0f);
-    m_last_mods                           = modifier::NONE;
+    m_last_mods                           = modifier::none;
 }
 
 linux_input_system::~linux_input_system() {}
@@ -49,7 +49,11 @@ void linux_input_system::set_platform_data(const shared_ptr<platform_data>& data
         {
             auto cam_info = c->get_current_scene()->get_active_camera_data().camera_info;
             if (cam_info)
-                cam_info->aspect = (float)w / (float)h;
+            {
+                cam_info->perspective.aspect = (float)w / (float)h;
+                cam_info->orthographic.x_mag = (float)w / (float)h;
+                cam_info->orthographic.y_mag = 1.0f;
+            }
             c->get_render_system_internal().lock()->set_viewport(0, 0, w, h);
         }
     });

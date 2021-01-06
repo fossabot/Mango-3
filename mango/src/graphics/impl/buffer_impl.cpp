@@ -17,33 +17,37 @@ buffer_impl::buffer_impl(const buffer_configuration& configuration)
 {
     m_target = GL_ARRAY_BUFFER; // Use this as default.
 
-    if (configuration.m_target == buffer_target::INDEX_BUFFER)
+    if (configuration.m_target == buffer_target::index_buffer)
     {
         m_target = GL_ELEMENT_ARRAY_BUFFER;
     }
-    else if (configuration.m_target == buffer_target::UNIFORM_BUFFER)
+    else if (configuration.m_target == buffer_target::uniform_buffer)
     {
         m_target = GL_UNIFORM_BUFFER;
     }
-    else if (configuration.m_target == buffer_target::TEXTURE_BUFFER)
+    else if (configuration.m_target == buffer_target::shader_storage_buffer)
+    {
+        m_target = GL_SHADER_STORAGE_BUFFER;
+    }
+    else if (configuration.m_target == buffer_target::texture_buffer)
     {
         m_target = GL_TEXTURE_BUFFER;
     }
 
     bool persistent = false;
 
-    if ((configuration.m_access & buffer_access::DYNAMIC_STORAGE) == configuration.m_access) // Used if glBufferSubData() etc. should be possible.
+    if ((configuration.m_access & buffer_access::dynamic_storage) != buffer_access::none) // Used if glBufferSubData() etc. should be possible.
     {
         m_access_flags |= GL_DYNAMIC_STORAGE_BIT;
     }
-    if ((configuration.m_access & buffer_access::MAPPED_ACCESS_READ) == configuration.m_access) // Used for glMapNamedBufferRange().
+    if ((configuration.m_access & buffer_access::mapped_access_read) != buffer_access::none) // Used for glMapNamedBufferRange().
     {
         m_access_flags |= GL_MAP_READ_BIT;
         m_access_flags |= GL_MAP_PERSISTENT_BIT;
         m_access_flags |= GL_MAP_COHERENT_BIT;
         persistent = true;
     }
-    if ((configuration.m_access & buffer_access::MAPPED_ACCESS_WRITE) == configuration.m_access) // Used for glMapNamedBufferRange().
+    if ((configuration.m_access & buffer_access::mapped_access_write) != buffer_access::none) // Used for glMapNamedBufferRange().
     {
         m_access_flags |= GL_MAP_WRITE_BIT;
         m_access_flags |= GL_MAP_PERSISTENT_BIT;
@@ -92,44 +96,6 @@ void buffer_impl::set_data(format internal_format, int64 offset, int64 size, for
     glClearNamedBufferSubData(m_name, gl_internal_f, static_cast<g_intptr>(offset), static_cast<g_sizeiptr>(size), gl_pixel_f, gl_type, data);
 }
 
-void buffer_impl::bind(buffer_target target, int32 index, int64 offset, int64 size)
-{
-    g_enum gl_target = GL_ARRAY_BUFFER; // Use this as default.
-
-    if (target == buffer_target::INDEX_BUFFER)
-    {
-        gl_target = GL_ELEMENT_ARRAY_BUFFER;
-    }
-    else if (target == buffer_target::UNIFORM_BUFFER)
-    {
-        gl_target = GL_UNIFORM_BUFFER;
-    }
-    else if (target == buffer_target::TEXTURE_BUFFER)
-    {
-        gl_target = GL_TEXTURE_BUFFER;
-    }
-    else if (target == buffer_target::NONE)
-    {
-        gl_target = m_target;
-    }
-
-    if (m_target != gl_target)
-    {
-        MANGO_LOG_WARN("Target changed in bind! This may lead to errors!");
-    }
-
-    MANGO_ASSERT(index >= 0, "Cannot bind buffer with negative index!");
-    MANGO_ASSERT(is_created(), "Buffer not created!");
-    MANGO_ASSERT(offset < m_size, "Can not bind data outside the buffer!");
-    MANGO_ASSERT(offset >= 0, "Can not bind data outside the buffer! Negative offset!");
-
-    size = (size == MAX_INT64) ? m_size - offset : size;
-    MANGO_ASSERT(size > 0, "Negative size is not possible!");
-    MANGO_ASSERT(offset + size <= m_size, "Can not bind data outside the buffer!");
-
-    glBindBufferRange(gl_target, static_cast<g_uint>(index), m_name, static_cast<g_intptr>(offset), static_cast<g_sizeiptr>(size));
-}
-
 void* buffer_impl::map(int64 offset, int64 length, buffer_access)
 {
     MANGO_ASSERT(is_created(), "Buffer not created!");
@@ -145,25 +111,3 @@ void* buffer_impl::map(int64 offset, int64 length, buffer_access)
 }
 
 void buffer_impl::unmap() {}
-
-void buffer_impl::lock()
-{
-    if (glIsSync(m_sync))
-    {
-        glDeleteSync(m_sync);
-    }
-    m_sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-}
-
-void buffer_impl::request_wait()
-{
-    if (glIsSync(m_sync))
-    {
-        while (1)
-        {
-            g_enum wait_return = glClientWaitSync(m_sync, GL_SYNC_FLUSH_COMMANDS_BIT, 10);
-            if (wait_return == GL_ALREADY_SIGNALED || wait_return == GL_CONDITION_SATISFIED)
-                return;
-        }
-    }
-}

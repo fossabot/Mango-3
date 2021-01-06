@@ -27,7 +27,10 @@ set(PRIVATE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/pipelines/deferred_pbr_render_system.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/steps/pipeline_step.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/steps/ibl_step.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/steps/shadow_map_step.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/gpu_buffer.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/hashing.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/util/helpers.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util/signal.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/resource_system.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/image_structures.hpp
@@ -38,6 +41,9 @@ set(PRIVATE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/dear_imgui/imgui_opengl3.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/dear_imgui/imgui_glfw.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/dear_imgui/imgui_widgets.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/allocator.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/linear_allocator.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/free_list_allocator.hpp
 
     # graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_common.hpp
@@ -71,11 +77,16 @@ set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/render_system_impl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/pipelines/deferred_pbr_render_system.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/steps/ibl_step.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering/steps/shadow_map_step.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/gpu_buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/resource_system.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scene/scene.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ui_system_impl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/dear_imgui/imgui_opengl3.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/dear_imgui/imgui_glfw.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/util/helpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/linear_allocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/free_list_allocator.cpp
 
     # graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_state.cpp
@@ -150,6 +161,7 @@ target_compile_definitions(mango
         $<$<CXX_COMPILER_ID:MSVC>:MANGO_WINMAIN>
         $<$<BOOL:${MANGO_BUILD_TESTS}>:MANGO_TEST>
         $<$<BOOL:${MANGO_PROFILE}>:MANGO_PROFILE>
+        $<$<CXX_COMPILER_ID:MSVC>: _CRT_SECURE_NO_WARNINGS>
     PRIVATE
         $<$<BOOL:${WIN32}>:WIN32>
         $<$<BOOL:${LINUX}>:LINUX>
