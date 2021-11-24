@@ -3,7 +3,7 @@
 //! There is also an implementation of the fnv1a hash function.
 //! \author    Paul Himmler
 //! \version   1.0
-//! \date      2020
+//! \date      2021
 //! \copyright Apache License 2.0
 
 #ifndef MANGO_HASHING_HPP
@@ -24,9 +24,12 @@ namespace mango
         static uint64 hash(const char* str)
         {
             uint64 hash = 5381;
-            int64 c;
-            while ((c = *str++))
+            int64 c     = *str++;
+            while (c)
+            {
                 hash = ((hash << 5) + hash) + c; // hash * 33 + c
+                c    = *str++;
+            }
             return hash;
         }
     };
