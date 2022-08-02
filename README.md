@@ -18,6 +18,9 @@
   <a href="https://github.com/Paul-Hi/Mango/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/Paul-Hi/Mango.svg"></a>
 </p>
 
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpethipet%2FMango.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpethipet%2FMango?ref=badge_large)
+
 # Mango
 
 Mango is an Open Source Framework. Or at least it should be in the future.
@@ -118,6 +121,7 @@ See the [guidelines](https://github.com/Paul-Hi/Mango/blob/master/CONTRIBUTING.m
 ## Images
 ### Material Playground
 ![alt text](https://github.com/Paul-Hi/Mango/blob/master/show/material_playground.png "Material Playground")
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpethipet%2FMango.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpethipet%2FMango?ref=badge_shield)
 ### Sponza
 ![alt text](https://github.com/Paul-Hi/Mango/blob/master/show/sponza.png "Sponza")
 ### Boom Box
